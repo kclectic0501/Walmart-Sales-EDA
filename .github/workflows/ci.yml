@@ -27,13 +27,36 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
+    - name: Record environment
+      run: |
+        {
+          echo "## Environment (Python ${{ matrix.python-version }})"
+          echo '```'
+          python -V
+          pip list
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+    
     - name: Run tests with pytest
       run: |
         pytest tests/ -v --tb=short
     
     - name: Execute Jupyter notebook
       run: |
+        set -o pipefail
         jupyter nbconvert --to notebook --execute \
           --ExecutePreprocessor.timeout=900 \
           notebooks/eda_sales_prediction.ipynb \
-          --output-dir ./notebooks
+          --output-dir ./notebooks 2>&1 | tee nb_execution.log
+    
+    - name: Publish notebook execution log
+      if: failure()
+      run: |
+        if [ -f nb_execution.log ]; then
+          {
+            echo "## Notebook execution log (last 60 lines)"
+            echo '```'
+            tail -n 60 nb_execution.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
